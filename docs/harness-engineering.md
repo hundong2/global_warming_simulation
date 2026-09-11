@@ -38,15 +38,16 @@ npm run preview
 - Cyclone failures for cold water, equatorial location, dry air and strong shear.
 - Adaptation changes fictional exposure, not physical temperature, rain or sea level.
 - Suitability falls away from an assumed optimum instead of increasing indefinitely.
+- Deterministic weather tracks, water genesis, land weakening, finite coordinates and lifecycle completion; fixed/stress candidate counts, steering independence in reference mode, land holes and independent reference locations.
 - Shared-state validation, round trips, unknown fields and invalid numbers.
 
 Do not change reference fixtures simply to make a model change pass. Test success does not establish predictive validity.
 
 ## Browser checks
 
-Desktop 1440×1000 and mobile 390×844 run the same user scenarios in Chromium. Software WebGL uses SwiftShader for reproducibility. Checks cover rendered frame counts, zero remote runtime requests, errors, overflow, settings, all layers, ENSO colors, camera, playback, pause/end, dialogs, health/adaptation, comparisons, checklist persistence, URL sharing, JSON export, idle rendering, missing geography, retry and WebGL context recovery.
+Desktop 1440×1000 and mobile 390×844 run the same user scenarios in Chromium. Software WebGL uses SwiftShader for reproducibility. Checks cover rendered frame counts, zero remote runtime requests, errors, overflow, settings, all layers, ENSO colors, camera, playback, pause/end, dialogs, health/adaptation, comparisons, checklist persistence, URL sharing, JSON export, idle rendering, missing geography, retry and WebGL context recovery. Weather checks compare actual cloud pixels and coordinates across time, verify pause/end and year independence, reconstruct shared weather settings, and inspect changing ice/sea sections.
 
-Screenshots in `test-results/` include the laboratory, ENSO, ice, cyclone, impacts and actions. Open them directly; DOM assertions do not prove visual quality. Evidence uses real rasterized output, not placeholders. Test artifacts are ignored by Git and retained by CI on failure. Native mobile GPU behavior, Firefox and Safari are not covered by these Chromium runs.
+Screenshots in `test-results/` include the laboratory, ENSO, ice, cyclone, weather motion/stress, enlarged ice/sea sections, impacts and actions. Open them directly; DOM assertions do not prove visual quality. Evidence uses real rasterized output, not placeholders. Test artifacts are ignored by Git and retained by CI on failure. Native mobile GPU behavior, Firefox and Safari are not covered by these Chromium runs.
 
 ## Extending the science
 

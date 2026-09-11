@@ -12,6 +12,9 @@ export interface Settings {
   humidity: number;
   latitude: number;
   adaptation: number;
+  weatherDay: number;
+  stormMode: 'reference' | 'stress';
+  trackVariability: number;
 }
 export const SCENARIOS = {
   low: { name: '강한 감축', ssp: 'SSP1-2.6', target: 1.8, sea: [0.32, 0.62] },
@@ -38,6 +41,9 @@ export const DEFAULT: Settings = {
   humidity: 75,
   latitude: 18,
   adaptation: 25,
+  weatherDay: 9,
+  stormMode: 'stress',
+  trackVariability: 65,
 };
 export const clamp = (v: number, min: number, max: number) =>
   Math.min(max, Math.max(min, v));
@@ -80,6 +86,14 @@ export function normalize(raw: Partial<Settings>): Settings {
     humidity: finite(raw.humidity, DEFAULT.humidity, 20, 100),
     latitude: finite(raw.latitude, DEFAULT.latitude, 0, 30),
     adaptation: finite(raw.adaptation, DEFAULT.adaptation, 0, 100),
+    weatherDay: finite(raw.weatherDay, DEFAULT.weatherDay, 0, 30),
+    stormMode: raw.stormMode === 'reference' ? 'reference' : DEFAULT.stormMode,
+    trackVariability: finite(
+      raw.trackVariability,
+      DEFAULT.trackVariability,
+      0,
+      100,
+    ),
   };
 }
 export function seaRange(target: number): [number, number] {

@@ -23,7 +23,7 @@ The 2100 likely ranges from IPCC AR6 WGI B.5.3, relative to 1995–2014, are:
 
 For custom `G`, linearly interpolate each range bound across these anchors. The 1.5°C association is authored: a warming level alone does not determine a unique sea-level outcome. For each endpoint bound `S2100`, calculate `S(Y) = 0.08 + (S2100 − 0.08)p^1.25`. The 0.08 m starting value and exponent are educational assumptions. Intermediate ranges are not assessed confidence intervals. Preset 2100 ranges retain the source's likely-range interpretation; a custom interval is an interpolation, not an IPCC scenario.
 
-The values already include multiple contributors such as thermal expansion and land-ice changes; we do not add the glacier percentage to sea level. Regional ocean dynamics, vertical land motion, tides, surge, terrain and coastal defenses are absent. Bright coastlines and the fictional coastal section are exaggerated illustrations, not flood footprints or a physically scaled rising sphere.
+The values already include multiple contributors such as thermal expansion and land-ice changes; we do not add the glacier percentage to sea level. Regional ocean dynamics, vertical land motion, tides, surge, terrain and coastal defenses are absent. Bright coastlines and the fictional coastal section are exaggerated illustrations, not flood footprints or a physically scaled rising sphere. The section keeps the datum fixed and shades the selected lower-to-upper range; its wave line is the arithmetic midpoint, not an assessed median.
 
 ## Glacier mass
 
@@ -51,7 +51,7 @@ C = 0 if SST < 26.5°C or |latitude| < 5°
 C = 100 × clip((SST−26)/4) × clip(1−V/30) × clip((H−30)/50) otherwise
 ```
 
-The 26.5°C warm-water condition is informed by NOAA, which also describes a warm layer of depth about 50 m. We do not model that depth. The 5° cutoff and all score coefficients are simplified assumptions, not operational thresholds or a calibrated genesis index. Initial disturbances, upper-air stability, moisture profiles, ocean heat content, steering winds and actual tracks are absent. The spiral is a symbol, not a simulated storm forecast. It appears for nonzero score; its size/rotation is illustrative. Global cyclone frequency does not necessarily rise with warming even as intensity and rainfall can increase.
+The 26.5°C warm-water condition is informed by NOAA, which also describes a warm layer of depth about 50 m. We do not model that depth. The 5° cutoff and all score coefficients are simplified assumptions, not operational thresholds or a calibrated genesis index. Initial disturbances, upper-air stability, moisture profiles, ocean heat content and observed steering winds are absent. The separate [weather experiment](weather-model.md) creates authored candidates and tracks when the environment gate permits, using a deterministic steering field, lifecycle and coarse land mask. Cloud size, spin and development indices are illustrative, not wind-speed or track forecasts. Global cyclone frequency does not necessarily rise with warming even as intensity and rainfall can increase.
 
 ## Extreme precipitation and flood exposure
 

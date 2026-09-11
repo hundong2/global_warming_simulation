@@ -790,63 +790,6 @@ h1 span {
 .question-card .text-button {
   margin-top: 15px;
 }
-.coast {
-  position: relative;
-  height: 120px;
-  background: linear-gradient(#16313e, #234a51);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-top: 18px;
-}
-.coast-land {
-  position: absolute;
-  inset: 0;
-  background: #5a6d5c;
-  clip-path: polygon(0 33%, 28% 33%, 80% 100%, 0 100%);
-}
-.coast-water {
-  position: absolute;
-  inset: auto 0 0;
-  height: var(--water);
-  background: #66bdca99;
-  border-top: 2px solid #9ce7ea;
-}
-.coast-house {
-  position: absolute;
-  top: 0;
-  left: 15%;
-  font-size: 45px;
-  color: #d7dbbf;
-}
-.coast small {
-  position: absolute;
-  bottom: 8px;
-  right: 12px;
-  font-size: 9px;
-  color: #e8f5ec;
-}
-.glacier-compare {
-  display: flex;
-  gap: 45px;
-  align-items: center;
-  margin: 15px 0 5px;
-}
-.glacier-compare > div {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-}
-.glacier-compare i {
-  width: 100px;
-  height: 54px;
-  background: linear-gradient(125deg, #e5f9f9 45%, #85b3c0 46%);
-  clip-path: polygon(0 100%, 24% 30%, 42% 61%, 67% 0, 100% 100%);
-  transform-origin: bottom;
-}
-.glacier-compare span {
-  font-size: 10px;
-  color: #a4c3cb;
-}
 .cyclone-lab {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1725,5 +1668,275 @@ dialog p {
   *::after {
     scroll-behavior: auto !important;
     transition: none !important;
+  }
+}
+
+/* Weather and enlarged comparison surfaces */
+.weather-panel,
+.detail-panel {
+  margin: 18px 0;
+  padding: 26px 30px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #122d35, #10232e);
+}
+.weather-heading,
+.detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.weather-heading h2,
+.detail-heading h2 {
+  font-size: 21px;
+  margin: 8px 0;
+  word-break: keep-all;
+}
+.detail-heading p {
+  margin: 8px 0;
+}
+.weather-controls {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 22px 0 12px;
+}
+.weather-controls > label {
+  flex: 1;
+  display: block;
+  font-size: 12px;
+}
+.weather-controls output {
+  float: right;
+  color: #b5dbe3;
+  font-variant-numeric: tabular-nums;
+}
+.weather-controls input {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+.weather-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 25px;
+  color: #abc1c7;
+  font-size: 11px;
+}
+.weather-key span:nth-child(2) {
+  color: #f3cf91;
+}
+.storm-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0;
+  min-height: 56px;
+}
+.storm-chip {
+  padding: 9px 12px;
+  border: 1px solid #36515b;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 3px 10px;
+  font-size: 11px;
+  min-width: 145px;
+}
+.storm-chip b {
+  color: #f3cf91;
+}
+.storm-chip i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  background: linear-gradient(
+    to right,
+    #91d5db var(--strength),
+    #34515c var(--strength)
+  );
+}
+.storm-chip small {
+  grid-column: 1 / -1;
+  color: #a9bfc6;
+  font-size: 10px;
+}
+.weather-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 35px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.weather-settings label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.weather-settings select,
+.weather-settings input {
+  width: 100%;
+}
+.weather-settings output {
+  float: right;
+  color: #a3d4db;
+}
+.weather-settings p {
+  line-height: 1.7;
+}
+.weather-note {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #becdd2;
+  padding: 14px 17px;
+  border-left: 2px solid #be9b64;
+  background: #b28c5010;
+  margin-bottom: 0;
+}
+.detail-stat {
+  text-align: right;
+  flex-shrink: 0;
+}
+.detail-stat strong {
+  display: block;
+  font-size: 40px;
+  line-height: 1.25;
+  font-weight: 400;
+  color: #a8e0ec;
+  font-variant-numeric: tabular-nums;
+}
+.detail-stat small {
+  font-size: 17px;
+  margin-left: 5px;
+}
+.detail-stat span {
+  color: #b8cdd3;
+  font-size: 12px;
+}
+.glacier-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 20px;
+}
+.glacier-compare article {
+  min-width: 0;
+}
+.comparison-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 4px 12px;
+}
+.comparison-label b {
+  font-size: 21px;
+  font-weight: 450;
+}
+.comparison-label span {
+  font-size: 13px;
+  color: #bedbe2;
+}
+.glacier-compare svg,
+.coast svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.coast {
+  max-width: 940px;
+  margin: 22px auto 0;
+}
+.detail-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 35px;
+  margin-top: 17px;
+}
+.detail-foot > span {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #c4d9df;
+  white-space: nowrap;
+}
+.detail-foot p {
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 0;
+}
+.detail-foot i {
+  display: inline-block;
+  width: 14px;
+  height: 7px;
+  margin-right: 5px;
+}
+.detail-foot .key-baseline {
+  border-top: 2px dashed #e9bf79;
+  margin-left: 14px;
+}
+.key-ice {
+  background: #a0ddec;
+}
+.key-water {
+  background: #79dbe291;
+  border: 1px solid #ade9f2;
+}
+@media (max-width: 680px) {
+  .weather-panel,
+  .detail-panel {
+    padding: 20px 17px;
+  }
+  .weather-heading,
+  .detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .weather-heading h2,
+  .detail-heading h2 {
+    font-size: 19px;
+  }
+  .weather-controls {
+    flex-wrap: wrap;
+    gap: 13px;
+  }
+  .weather-controls > label {
+    flex-basis: 100%;
+    order: 3;
+  }
+  .weather-controls .quiet {
+    margin-left: auto;
+  }
+  .weather-settings,
+  .glacier-compare {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .weather-settings {
+    gap: 8px;
+  }
+  .weather-note {
+    font-size: 11px;
+  }
+  .detail-stat {
+    text-align: left;
+  }
+  .detail-stat strong {
+    font-size: 34px;
+  }
+  .detail-foot {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .comparison-label {
+    margin-top: 0;
+  }
+  .coast svg text {
+    font-size: 30px;
+  }
+  .storm-chip {
+    min-width: 0;
+    flex: 1 0 120px;
   }
 }

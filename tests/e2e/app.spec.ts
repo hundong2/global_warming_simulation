@@ -99,6 +99,7 @@ test('cyclone experiment responds to shear and latitude without inventing probab
   await expect(page.locator('#cyclone-lab')).toBeVisible();
   await range(page, 'shear', 30);
   await expect(page.locator('#cyclone-score')).toContainText('0 / 100점');
+  await expect(page.locator('#globe')).toHaveAttribute('data-storm-count', '0');
   await range(page, 'shear', 0);
   await range(page, 'latitude', 0);
   await expect(page.locator('#cyclone-explanation')).toContainText(
@@ -110,6 +111,171 @@ test('cyclone experiment responds to shear and latitude without inventing probab
     path: info.outputPath('cyclone.png'),
     fullPage: true,
   });
+});
+test('weather clock moves clouds and trails independently, pauses, and stops at day 30', async ({
+  page,
+}, info) => {
+  await ready(page);
+  await page.locator('[data-layer="cyclone"]').click();
+  const year = await page.locator('#year-value').textContent();
+  const positions = await page
+    .locator('#globe')
+    .getAttribute('data-storm-positions');
+  const imageBefore = await page.locator('#globe canvas').screenshot();
+  await page
+    .getByRole('button', { name: '태풍 이동 재생', exact: true })
+    .click();
+  await expect
+    .poll(async () =>
+      Number(await page.locator('#globe').getAttribute('data-weather-day')),
+    )
+    .toBeGreaterThan(9.4);
+  await page
+    .getByRole('button', { name: '태풍 이동 일시정지', exact: true })
+    .click();
+  const day = await page.locator('#globe').getAttribute('data-weather-day');
+  await expect(page.locator('#globe')).not.toHaveAttribute(
+    'data-storm-positions',
+    positions!,
+  );
+  await expect
+    .poll(async () =>
+      Buffer.compare(
+        imageBefore,
+        await page.locator('#globe canvas').screenshot(),
+      ),
+    )
+    .not.toBe(0);
+  await page.waitForTimeout(300);
+  await expect(page.locator('#globe')).toHaveAttribute(
+    'data-weather-day',
+    day!,
+  );
+  await expect(page.locator('#year-value')).toHaveText(year!);
+  await page.screenshot({
+    path: info.outputPath('weather-motion.png'),
+    fullPage: true,
+  });
+  await range(page, 'weatherDay', 29.9);
+  await page
+    .getByRole('button', { name: '태풍 이동 재생', exact: true })
+    .click();
+  await expect(page.locator('#weather-play')).toHaveAttribute(
+    'aria-label',
+    '태풍 이동 재생',
+  );
+  await expect(page.locator('#globe')).toHaveAttribute(
+    'data-weather-day',
+    '30.00',
+  );
+  await expect(page.locator('#globe')).toHaveAttribute('data-storm-count', '0');
+  await page
+    .getByRole('button', { name: '태풍 이동 재생', exact: true })
+    .click();
+  await page.locator('#sources-open').click();
+  await expect(page.locator('#weather-play')).toHaveAttribute(
+    'aria-label',
+    '태풍 이동 재생',
+  );
+  await page.locator('#sources-close').click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.locator('[data-layer="temperature"]').click();
+  await page.getByRole('button', { name: '시간 재생', exact: true }).click();
+  await page.locator('[data-layer="cyclone"]').click();
+  await expect(page.locator('#play')).toHaveAttribute(
+    'aria-label',
+    '시간 재생',
+  );
+  await expect(page.locator('#weather-play')).toHaveAttribute(
+    'aria-label',
+    '태풍 이동 일시정지',
+  );
+});
+
+test('stress candidates and path variability respond and reproduce from a share link', async ({
+  page,
+}, info) => {
+  await ready(page);
+  await page.locator('[data-layer="cyclone"]').click();
+  await range(page, 'year', 2100);
+  await page.locator('[data-scenario="low"]').click();
+  const low = Number(
+    await page.locator('#weather-count').getAttribute('data-candidates'),
+  );
+  await page.locator('[data-scenario="high"]').click();
+  const high = Number(
+    await page.locator('#weather-count').getAttribute('data-candidates'),
+  );
+  expect(high).toBeGreaterThan(low);
+  await page.locator('#stormMode').selectOption('reference');
+  await expect(page.locator('#weather-count')).toHaveAttribute(
+    'data-candidates',
+    '4',
+  );
+  await page.locator('#stormMode').selectOption('stress');
+  await range(page, 'trackVariability', 0);
+  const smooth = await page
+    .locator('#globe')
+    .getAttribute('data-storm-positions');
+  await range(page, 'trackVariability', 100);
+  await range(page, 'weatherDay', 12.3);
+  await expect(page.locator('#globe')).not.toHaveAttribute(
+    'data-storm-positions',
+    smooth!,
+  );
+  const expected = await page
+    .locator('#globe')
+    .getAttribute('data-storm-positions');
+  await page.locator('#share').click();
+  const url = await page.locator('#share-url').inputValue();
+  await page.goto(url);
+  await expect(page.locator('#globe')).toHaveAttribute('data-frames', /[1-9]/);
+  await expect(page.locator('#globe')).toHaveAttribute(
+    'data-storm-positions',
+    expected!,
+  );
+  await expect(page.locator('#weatherDay')).toHaveValue('12.3');
+  await expect(page.locator('#trackVariability')).toHaveValue('100');
+  await page.screenshot({
+    path: info.outputPath('weather-stress.png'),
+    fullPage: true,
+  });
+});
+
+test('enlarged ice and coastal comparisons change with year and fit the viewport', async ({
+  page,
+}, info) => {
+  await ready(page);
+  await page.locator('[data-scenario="high"]').click();
+  await page.locator('[data-layer="ice"]').click();
+  await range(page, 'year', 2020);
+  const first = await page.locator('.glacier-compare').screenshot();
+  await range(page, 'year', 2100);
+  await expect(page.locator('.detail-stat')).toContainText('41.0');
+  expect(
+    Buffer.compare(first, await page.locator('.glacier-compare').screenshot()),
+  ).not.toBe(0);
+  await page.screenshot({
+    path: info.outputPath('ice-detail.png'),
+    fullPage: true,
+  });
+  await page.locator('[data-layer="sea"]').click();
+  await expect(page.locator('.detail-stat')).toContainText('63–101');
+  const coast = await page.locator('.coast').screenshot();
+  await page.screenshot({
+    path: info.outputPath('sea-detail.png'),
+    fullPage: true,
+  });
+  await range(page, 'year', 2020);
+  await expect(page.locator('.detail-stat')).toContainText('8–8');
+  expect(
+    Buffer.compare(coast, await page.locator('.coast').screenshot()),
+  ).not.toBe(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });
 test('playback advances, pause freezes, dialogs stop time, and end stops at 2100', async ({
   page,

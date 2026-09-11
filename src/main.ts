@@ -13,6 +13,13 @@ import {
 } from './simulation/climate';
 import { Globe, loadGeography } from './render/globe';
 import { actions, icon, layerDetails, sources } from './ui/content';
+import { layerDetail } from './ui/details';
+import { createLandQuery, type LandQuery } from './simulation/geography';
+import {
+  buildStormSeason,
+  sampleStormSeason,
+  type StormSeason,
+} from './simulation/weather';
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -23,6 +30,15 @@ let playing = false;
 let interval: ReturnType<typeof setInterval> | undefined;
 let speed = 1;
 let loading = false;
+let landQuery: LandQuery = () => true;
+let season: StormSeason = {
+  tracks: [],
+  candidateCount: 0,
+  mode: state.stormMode,
+};
+let seasonKey = '';
+let weatherPlaying = false;
+let weatherInterval: ReturnType<typeof setInterval> | undefined;
 let checked = new Set<string>();
 try {
   const stored: unknown = JSON.parse(
@@ -82,9 +98,18 @@ $('#app').innerHTML = `
         <button class="impact-link" data-tab="impacts">우리 삶에는 어떤 변화가? ${icon('arrow', 18)}</button>
       </aside>
     </div>
+    <section id="weather-panel" class="weather-panel" hidden aria-label="태풍 이동 실험">
+      <div class="weather-heading"><div><p class="eyebrow">30 DAYS IN THE WESTERN PACIFIC</p><h2>바다에서 태어나, 바람을 따라</h2></div><span class="pill" id="weather-count"></span></div>
+      <div class="weather-controls"><button id="weather-play" class="outlined" aria-label="태풍 이동 재생"></button><label for="weatherDay">날씨 시간 <output id="weather-day"></output><input id="weatherDay" type="range" min="0" max="30" step="0.1"/></label><button id="weather-reset" class="quiet">처음부터</button></div>
+      <div class="weather-key"><span>흰 구름 · 눈과 나선형 비구름</span><span>금빛 선 · 지나온 경로</span><span>기후 연도와 별도의 30일 실험</span></div>
+      <div id="storm-list" class="storm-list"></div>
+      <div class="weather-settings"><div><label for="stormMode">태풍 수 실험</label><select id="stormMode"><option value="stress">가상 극한 실험 · 따뜻할수록 후보 증가</option><option value="reference">비교 실험 · 후보 수 고정</option></select><p id="storm-mode-help" class="micro"></p></div><div><label for="trackVariability">경로 굴곡 <output id="track-variability"></output></label><input id="trackVariability" type="range" min="0" max="100" step="5"/><p class="micro">조향 바람의 흔들림을 가정합니다. 극한 실험에서는 온난화에 따라 굴곡도 강조합니다. 실제 미래 경로의 전망은 아닙니다.</p></div></div>
+      <p class="weather-note">온난화가 전 세계 태풍 수를 반드시 늘리지는 않습니다. 강한 태풍의 비중·강수 증가에 관한 연구와 별개로, 이 실험의 후보 수·경로·구름 크기는 교육용 가정입니다. 태풍끼리의 상호작용은 계산하지 않습니다.</p>
+    </section>
+    <div id="layer-detail"></div>
     <div class="timeline"><button class="play-button" id="play" aria-label="시간 재생">${icon('play', 17)}</button><div class="timeline-year"><output id="year-value" for="year">2050</output><span>YEAR / 연도</span></div><div class="timeline-track"><label class="sr-only" for="year">실험 연도</label><input type="range" id="year" min="2020" max="2100" step="1"/><div class="range-ticks"><span>2020</span><span>2040</span><span>2060</span><span>2080</span><span>2100</span></div></div><select id="speed" aria-label="시간 재생 속도"><option value="1">1× 속도</option><option value="2">2× 속도</option><option value="5">5× 속도</option></select></div>
     <div class="explainer-row"><article class="layer-explainer"><span class="eyebrow">OBSERVE & UNDERSTAND</span><h2 id="layer-title"></h2><p id="layer-description"></p><div id="layer-extra"></div></article><article class="question-card"><span class="small accent">작은 실험 제안</span><h3 id="experiment-title">태평양의 색은 어떻게 달라질까요?</h3><p id="experiment-text">엘니뇨와 라니냐를 번갈아 선택하고 태평양으로 이동해 보세요. 동쪽 바다의 온도 차이를 발견할 수 있어요.</p><button class="text-button" id="experiment">태평양 살펴보기 ${icon('arrow', 17)}</button></article></div>
-    <section class="cyclone-lab" id="cyclone-lab" hidden><div><p class="eyebrow">TROPICAL CYCLONE / 생성 조건 실험</p><h2>따뜻한 바다에 조건을 더하면</h2><p>서태평양 동경 140°의 가상 해역 · 실제 발생 확률과 태풍 수는 계산하지 않습니다.</p><strong class="cyclone-result" id="cyclone-score"></strong><p id="cyclone-explanation"></p></div><div class="cyclone-sliders"><label for="shear">연직 바람 시어 <output id="shear-value"></output><small>높이에 따른 바람 차이 · 강할수록 조직화 방해</small></label><input id="shear" type="range" min="0" max="30" step="1"/><label for="humidity">상대 습도 <output id="humidity-value"></output></label><input id="humidity" type="range" min="20" max="100" step="1"/><label for="latitude">북위 <output id="latitude-value"></output><small>적도 부근에서는 회전을 만드는 효과가 약해요.</small></label><input id="latitude" type="range" min="0" max="30" step="1"/></div></section>
+    <section class="cyclone-lab" id="cyclone-lab" hidden><div><p class="eyebrow">TROPICAL CYCLONE / 생성 조건 실험</p><h2>따뜻한 바다에 조건을 더하면</h2><p>서태평양 동경 140°의 생성 조건 점수입니다. 위의 이동 실험은 여러 가상 후보를 따로 생성하며 실제 발생 확률·연간 발생 수를 예측하지 않습니다.</p><strong class="cyclone-result" id="cyclone-score"></strong><p id="cyclone-explanation"></p></div><div class="cyclone-sliders"><label for="shear">연직 바람 시어 <output id="shear-value"></output><small>높이에 따른 바람 차이 · 강할수록 조직화 방해</small></label><input id="shear" type="range" min="0" max="30" step="1"/><label for="humidity">상대 습도 <output id="humidity-value"></output></label><input id="humidity" type="range" min="20" max="100" step="1"/><label for="latitude">북위 <output id="latitude-value"></output><small>적도 부근에서는 회전을 만드는 효과가 약해요.</small></label><input id="latitude" type="range" min="0" max="30" step="1"/></div></section>
   </section>
   <section id="view-impacts" class="view" aria-label="기후와 우리" hidden>
     <div class="intro"><div><p class="eyebrow">CONNECTED CLIMATE, CONNECTED LIVES</p><h1>기후의 변화가 <span>삶의 변화로.</span></h1><p>강수, 해안, 건강의 연결을 읽어 보세요. 같은 온도에서도 노출과 대비에 따라 결과가 달라집니다.</p></div><button class="outlined" data-tab="lab">실험 설정으로 ${icon('arrow', 17)}</button></div>
@@ -102,8 +127,8 @@ $('#app').innerHTML = `
   </section>
   </main>
   <footer><span><b>CLIMATE LAB</b> 하나뿐인 지구를 이해하는 시간.</span><div><button class="text-button" id="footer-sources">모델과 한계</button><a href="https://github.com/hundong2/global_warming_simulation" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span>교육용 · 공개된 과학을 바탕으로</span></div></footer>
-  <dialog id="sources-dialog" aria-labelledby="sources-title"><div class="dialog-heading"><div><p class="eyebrow">SCIENCE & TRANSPARENCY</p><h2 id="sources-title">모델, 근거, 그리고 한계</h2></div><button id="sources-close" class="icon-button" aria-label="모델과 출처 닫기">×</button></div><p>이 실험실은 연구 결과를 탐색하는 교육 도구입니다. 기후 모형·기상 예보·침수 지도·질병 예측을 직접 실행하지 않습니다.</p><div class="model-summary"><h3>무엇을 계산하나요?</h3><p><strong>온도·해수면:</strong> IPCC의 세기말 시나리오 대표값과 해수면 가능성 높은 범위를 사용합니다. 2020년 온난화 +1.2°C·해수면 +0.08 m는 교육용 시작 가정입니다. 연도 사이 값과 사용자 온도에 대응하는 해수면은 자체 보간입니다.</p><p><strong>빙하:</strong> Rounce et al.의 1.5°C·4°C 종점 사이를 보간하고, 2015–2100년은 선형 변화로 표현합니다. 4°C 초과는 4°C 참고값으로 제한합니다. 오차는 95% 신뢰구간이며 IPCC 해수면 범위와 의미가 다릅니다. 지구본 기호의 크기와 해안선 밝기는 실제 규모가 아닙니다.</p><p><strong>태풍:</strong> 해수면 온도·시어·습도·위도에 따른 자체 제작 0–100점입니다. 실제 발생 수·강도·경로·발생 확률을 예측하지 않습니다. 온난화가 모든 해역의 태풍 수를 늘린다는 의미가 아닙니다.</p><p><strong>풍수해·건강:</strong> 대비 실험과 가상 매개체 온도 적합도는 보정되지 않은 개념 식입니다. 실제 재해·감염병 발생률 자료는 제공하지 않습니다. 연구 근거가 있는 극한 강수의 상대 빈도를 따로 표시합니다.</p></div><h3>주요 자료</h3><ul class="source-list">${sources.map(([title, url, text]) => `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${title} ↗</a><p>${text}</p></li>`).join('')}</ul><p class="micro">지도: Natural Earth v5.1.2, public domain · 앱 실행 시 외부 데이터를 요청하지 않습니다. 소스와 전체 식은 저장소의 영어·한국어 문서에 기록되어 있습니다.</p><button id="export" class="outlined">현재 실험을 JSON으로 저장 ${icon('share', 16)}</button></dialog>
-  <dialog id="share-dialog" aria-labelledby="share-title"><div class="dialog-heading"><h2 id="share-title">같은 설정으로 함께 실험해요</h2><button class="icon-button" id="share-close" aria-label="공유 창 닫기">×</button></div><p>이 주소에 온도·연도·레이어·생성 조건·대비 수준이 담겨 있어요. 같은 배포 주소에서 열면 같은 설정이 적용됩니다.</p><label for="share-url">실험 주소</label><input id="share-url" type="text" readonly/><button id="copy-link" class="outlined">링크 복사</button><p class="micro" id="share-local-note"></p></dialog>
+  <dialog id="sources-dialog" aria-labelledby="sources-title"><div class="dialog-heading"><div><p class="eyebrow">SCIENCE & TRANSPARENCY</p><h2 id="sources-title">모델, 근거, 그리고 한계</h2></div><button id="sources-close" class="icon-button" aria-label="모델과 출처 닫기">×</button></div><p>이 실험실은 연구 결과를 탐색하는 교육 도구입니다. 기후 모형·기상 예보·침수 지도·질병 예측을 직접 실행하지 않습니다.</p><div class="model-summary"><h3>무엇을 계산하나요?</h3><p><strong>온도·해수면:</strong> IPCC의 세기말 시나리오 대표값과 해수면 가능성 높은 범위를 사용합니다. 2020년 온난화 +1.2°C·해수면 +0.08 m는 교육용 시작 가정입니다. 연도 사이 값과 사용자 온도에 대응하는 해수면은 자체 보간입니다.</p><p><strong>빙하:</strong> Rounce et al.의 1.5°C·4°C 종점 사이를 보간하고, 2015–2100년은 선형 변화로 표현합니다. 4°C 초과는 4°C 참고값으로 제한합니다. 오차는 95% 신뢰구간이며 IPCC 해수면 범위와 의미가 다릅니다. 지구본 기호의 크기와 해안선 밝기는 실제 규모가 아닙니다.</p><p><strong>태풍:</strong> 해수면 온도·시어·습도·위도에 따른 자체 제작 0–100점입니다. 눈·눈벽·비구름과 가상 이동 경로를 30일 동안 표현합니다. 육지·차가운 바다에서 약해집니다. 실제 발생 수·풍속·경로·확률을 예측하지 않습니다. 온난화가 모든 해역의 태풍 수를 늘린다는 의미가 아닙니다.</p><p><strong>풍수해·건강:</strong> 대비 실험과 가상 매개체 온도 적합도는 보정되지 않은 개념 식입니다. 실제 재해·감염병 발생률 자료는 제공하지 않습니다. 연구 근거가 있는 극한 강수의 상대 빈도를 따로 표시합니다.</p></div><h3>주요 자료</h3><ul class="source-list">${sources.map(([title, url, text]) => `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${title} ↗</a><p>${text}</p></li>`).join('')}</ul><p class="micro">지도: Natural Earth v5.1.2, public domain · 앱 실행 시 외부 데이터를 요청하지 않습니다. 소스와 전체 식은 저장소의 영어·한국어 문서에 기록되어 있습니다.</p><button id="export" class="outlined">현재 실험을 JSON으로 저장 ${icon('share', 16)}</button></dialog>
+  <dialog id="share-dialog" aria-labelledby="share-title"><div class="dialog-heading"><h2 id="share-title">같은 설정으로 함께 실험해요</h2><button class="icon-button" id="share-close" aria-label="공유 창 닫기">×</button></div><p>이 주소에 온도·연도·레이어·생성 조건·날씨 시간·경로 설정·대비 수준이 담겨 있어요. 같은 배포 주소에서 열면 같은 설정이 적용됩니다.</p><label for="share-url">실험 주소</label><input id="share-url" type="text" readonly/><button id="copy-link" class="outlined">링크 복사</button><p class="micro" id="share-local-note"></p></dialog>
   <div id="toast" role="status" class="toast" hidden></div>
 `;
 
@@ -121,7 +146,6 @@ function updateMotion() {
   globe?.setMotion(
     $('#rotate') instanceof HTMLInputElement &&
       $<HTMLInputElement>('#rotate').checked,
-    playing && !matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
   globe?.setActive(
     activeTab === 'lab' &&
@@ -129,7 +153,61 @@ function updateMotion() {
       !$<HTMLDialogElement>('#share-dialog').open,
   );
 }
+function refreshWeather() {
+  const key = JSON.stringify({
+    ...state,
+    weatherDay: 0,
+    layer: '',
+    adaptation: 0,
+  });
+  if (key !== seasonKey) {
+    season = buildStormSeason(state, landQuery);
+    seasonKey = key;
+  }
+  const snapshot = sampleStormSeason(season, state.weatherDay);
+  globe?.updateWeather(snapshot);
+  $<HTMLInputElement>('#weatherDay').value = String(state.weatherDay);
+  setText('#weather-day', `${state.weatherDay.toFixed(1)} / 30일`);
+  setText(
+    '#weather-count',
+    `활성 ${snapshot.storms.length}개 · 후보 ${snapshot.candidateCount}개`,
+  );
+  $('#weather-count').dataset.candidates = String(snapshot.candidateCount);
+  $('#storm-list').innerHTML = snapshot.storms.length
+    ? snapshot.storms
+        .map(
+          (storm) =>
+            `<span class="storm-chip"><b>T${String(storm.id + 1).padStart(2, '0')}</b> ${storm.stage}<i style="--strength:${Math.round(storm.intensity * 100)}%"></i><small>가상 발달 ${Math.round(storm.intensity * 100)}/100</small></span>`,
+        )
+        .join('')
+    : '<p class="micro">현재 활성 태풍이 없습니다. 시간을 이동하거나 생성 조건을 바꿔 보세요.</p>';
+}
+function setWeatherPlaying(value: boolean) {
+  if (value && playing) setPlaying(false);
+  clearInterval(weatherInterval);
+  weatherPlaying = value;
+  $('#weather-play').innerHTML =
+    `${icon(value ? 'pause' : 'play', 16)} ${value ? '이동 일시정지' : '이동 재생'}`;
+  $('#weather-play').setAttribute(
+    'aria-label',
+    value ? '태풍 이동 일시정지' : '태풍 이동 재생',
+  );
+  if (!value) return;
+  if (state.weatherDay >= 30) state.weatherDay = 0;
+  let last = performance.now();
+  weatherInterval = setInterval(() => {
+    const now = performance.now();
+    state.weatherDay = Math.min(
+      30,
+      state.weatherDay + Math.min(0.15, (now - last) / 1000),
+    );
+    last = now;
+    refreshWeather();
+    if (state.weatherDay >= 30) setWeatherPlaying(false);
+  }, 65);
+}
 function setPlaying(value: boolean) {
+  setWeatherPlaying(false);
   playing = value;
   clearInterval(interval);
   $('#play').innerHTML = icon(value ? 'pause' : 'play', 17);
@@ -166,6 +244,8 @@ function refresh() {
     'humidity',
     'latitude',
     'adaptation',
+    'stormMode',
+    'trackVariability',
   ] as const)
     $<HTMLInputElement | HTMLSelectElement>(`#${id}`).value = String(state[id]);
   document.querySelectorAll<HTMLElement>('[data-year]').forEach((el) => {
@@ -232,13 +312,16 @@ function refresh() {
     );
   }
   $('#cyclone-lab').hidden = state.layer !== 'cyclone';
-  if (state.layer === 'sea')
-    $('#layer-extra').innerHTML =
-      `<div class="coast" style="--water:${22 + m.sea[1] * 25}%"><span class="coast-land"></span><span class="coast-water"></span><span class="coast-house">⌂</span><small>가상 해안 단면 · 높이 과장 · 침수 예측 아님</small></div>`;
-  else if (state.layer === 'ice')
-    $('#layer-extra').innerHTML =
-      `<div class="glacier-compare"><div><i></i><span>2015 기준 질량</span></div><div><i style="transform:scale(${Math.cbrt(1 - m.glacierLoss / 100)})"></i><span>${state.year}년 · ${(100 - m.glacierLoss).toFixed(1)}% 남음</span></div></div><p class="micro">2100년 참고: 손실 ${m.glacierTarget.toFixed(1)} ± ${m.glacierSpread.toFixed(1)}% (95% 신뢰구간${state.target > 4 ? ', 4°C 상한 적용' : ''}). 중간값은 자체 보간입니다.</p>`;
-  else $('#layer-extra').innerHTML = '';
+  $('#layer-extra').innerHTML = '';
+  $('#layer-detail').innerHTML = layerDetail(state);
+  $('#weather-panel').hidden = state.layer !== 'cyclone';
+  setText('#track-variability', String(state.trackVariability));
+  setText(
+    '#storm-mode-help',
+    state.stormMode === 'stress'
+      ? '온도에 따라 30일 동안 최대 12개 후보를 배치하는 가상 설정입니다. 관측된 발생률이 아닙니다.'
+      : '동일한 4개 후보로 온도와 생성 조건의 영향을 비교합니다. 실제 기후 전망이 아닙니다.',
+  );
   const experiment =
     state.layer === 'cyclone'
       ? [
@@ -304,6 +387,7 @@ function refresh() {
     })
     .join('');
   globe?.update(state);
+  refreshWeather();
   if (state.year === 2100 && playing) setPlaying(false);
 }
 async function startGlobe() {
@@ -315,6 +399,8 @@ async function startGlobe() {
   globe = undefined;
   try {
     const geography = await loadGeography();
+    landQuery = createLandQuery(geography);
+    seasonKey = '';
     globe = new Globe(
       $('#globe'),
       geography,
@@ -328,6 +414,7 @@ async function startGlobe() {
         $('#globe-error').hidden = true;
       },
     );
+    refreshWeather();
     updateMotion();
   } catch (error) {
     $('#globe-error').hidden = false;
@@ -354,8 +441,14 @@ document.querySelectorAll<HTMLElement>('[data-scenario]').forEach((button) =>
 );
 document.querySelectorAll<HTMLElement>('[data-layer]').forEach((button) =>
   button.addEventListener('click', () => {
+    setWeatherPlaying(false);
     state.layer = button.dataset.layer as Layer;
     refresh();
+    if (state.layer === 'cyclone') {
+      globe?.focus('asia');
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
+        setWeatherPlaying(true);
+    }
   }),
 );
 document
@@ -372,6 +465,7 @@ for (const id of [
   'humidity',
   'latitude',
   'adaptation',
+  'trackVariability',
 ] as const)
   $(`#${id}`).addEventListener('input', () => {
     setPlaying(false);
@@ -380,8 +474,30 @@ for (const id of [
     refresh();
   });
 $('#enso').addEventListener('change', () => {
+  setWeatherPlaying(false);
   state.enso = $<HTMLSelectElement>('#enso').value as Enso;
   refresh();
+});
+$('#stormMode').addEventListener('change', () => {
+  setPlaying(false);
+  state.stormMode = $<HTMLSelectElement>('#stormMode')
+    .value as Settings['stormMode'];
+  refresh();
+});
+$('#weather-play').addEventListener('click', () => {
+  const next = !weatherPlaying;
+  setPlaying(false);
+  setWeatherPlaying(next);
+});
+$('#weatherDay').addEventListener('input', () => {
+  setPlaying(false);
+  state.weatherDay = Number($<HTMLInputElement>('#weatherDay').value);
+  refreshWeather();
+});
+$('#weather-reset').addEventListener('click', () => {
+  setWeatherPlaying(false);
+  state.weatherDay = 0;
+  refreshWeather();
 });
 $('#reset').addEventListener('click', () => {
   setPlaying(false);
@@ -469,6 +585,7 @@ $('#export').addEventListener('click', () => {
           schemaVersion: 1,
           settings: state,
           results: evaluate(state),
+          weather: sampleStormSeason(season, state.weatherDay),
           assumptions:
             'Educational interpolation; sea relative to 1995–2014; glacier mass relative to 2015; hazard and vector scores are not incidence probabilities.',
           sources: sources.map(([name, url]) => ({ name, url })),
@@ -526,8 +643,10 @@ window.addEventListener('hashchange', () => {
 });
 window.addEventListener('pagehide', () => {
   clearInterval(interval);
+  clearInterval(weatherInterval);
   globe?.dispose();
 });
 setText('#action-count', `${checked.size} / 6`);
+setWeatherPlaying(false);
 refresh();
 void startGlobe();

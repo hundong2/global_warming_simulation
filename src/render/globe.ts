@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { Geography } from '../simulation/geography';
+import type { WeatherSnapshot } from '../simulation/weather';
+import { WeatherVisual } from './weather-visual';
+import { coastDistances, glacierVisual } from './surface-visual';
 import {
   evaluate,
   oceanTemperature,
@@ -7,8 +11,6 @@ import {
   type Settings,
 } from '../simulation/climate';
 
-type Geometry = { type: string; coordinates: number[][][] | number[][][][] };
-type Geography = { features: { geometry: Geometry }[] };
 const WIDTH = 1024;
 const HEIGHT = 512;
 export function location(lat: number, lon: number, radius = 1) {
@@ -49,16 +51,15 @@ export class Globe {
   private context: CanvasRenderingContext2D;
   private texture: THREE.CanvasTexture;
   private land = new Path2D();
-  private ice: THREE.Mesh[] = [];
-  private cyclone = new THREE.Group();
-  private water: THREE.Mesh;
+  private ice: ReturnType<typeof glacierVisual>[] = [];
+  private weather = new WeatherVisual();
+  private coast: Uint16Array;
   private observer: ResizeObserver;
   private request = 0;
   private last = 0;
   private dirty = true;
   private active = true;
   private rotating = false;
-  private animation = false;
   private lost = false;
   private disposed = false;
   private frames = 0;
@@ -128,6 +129,7 @@ export class Globe {
         }
       }
     }
+    this.coast = coastDistances(this.land, WIDTH, HEIGHT);
     this.scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(1, 96, 64),
@@ -152,16 +154,6 @@ export class Globe {
       }),
     );
     this.scene.add(halo);
-    this.water = new THREE.Mesh(
-      new THREE.SphereGeometry(1.008, 64, 40),
-      new THREE.MeshBasicMaterial({
-        color: '#65c8e6',
-        transparent: true,
-        opacity: 0.08,
-        wireframe: true,
-      }),
-    );
-    this.scene.add(this.water);
     const grid: number[] = [];
     for (let lat = -60; lat <= 60; lat += 30)
       for (let lon = -180; lon < 180; lon += 3)
@@ -200,48 +192,13 @@ export class Globe {
       [69, 19],
       [64, -19],
     ]) {
-      const glacier = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.044, 0),
-        new THREE.MeshPhongMaterial({
-          color: '#e4faff',
-          emissive: '#457c96',
-          emissiveIntensity: 0.4,
-          flatShading: true,
-        }),
-      );
-      glacier.position.copy(location(lat, lon, 1.008));
-      glacier.lookAt(glacier.position.clone().multiplyScalar(2));
+      const glacier = glacierVisual();
+      glacier.root.position.copy(location(lat, lon, 1.008));
+      glacier.root.lookAt(glacier.root.position.clone().multiplyScalar(2));
       this.ice.push(glacier);
-      this.scene.add(glacier);
+      this.scene.add(glacier.root);
     }
-    for (let arm = 0; arm < 3; arm++) {
-      const pts: THREE.Vector3[] = [];
-      for (let i = 0; i < 85; i++) {
-        const a = i * 0.083 + (arm * Math.PI * 2) / 3;
-        const r = 0.007 + i * 0.00115;
-        pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0));
-      }
-      this.cyclone.add(
-        new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints(pts),
-          new THREE.LineBasicMaterial({
-            color: '#fff1d0',
-            transparent: true,
-            opacity: 0.95,
-          }),
-        ),
-      );
-    }
-    this.cyclone.add(
-      new THREE.Mesh(
-        new THREE.RingGeometry(0.007, 0.012, 24),
-        new THREE.MeshBasicMaterial({
-          color: '#ffe3ad',
-          side: THREE.DoubleSide,
-        }),
-      ),
-    );
-    this.scene.add(this.cyclone);
+    this.scene.add(this.weather.group);
     this.camera.position.copy(location(22, 125, 3.7));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enablePan = false;
@@ -310,9 +267,15 @@ export class Globe {
         ctx.fillStyle =
           settings.layer === 'temperature' && settings.enso !== 'neutral'
             ? `#${anomalyColor(ensoAnomaly(lat, lon, settings.enso)).getHexString()}`
-            : settings.layer === 'temperature' || settings.layer === 'cyclone'
-              ? `#${oceanColor(oceanTemperature(lat, lon, m.warming, settings.enso)).getHexString()}`
-              : '#174355';
+            : settings.layer === 'cyclone'
+              ? `#${oceanColor(
+                  oceanTemperature(lat, lon, m.warming, settings.enso),
+                )
+                  .lerp(new THREE.Color('#092e46'), 0.62)
+                  .getHexString()}`
+              : settings.layer === 'temperature'
+                ? `#${oceanColor(oceanTemperature(lat, lon, m.warming, settings.enso)).getHexString()}`
+                : '#174355';
         ctx.fillRect(x, y, 4, 4);
       }
     ctx.save();
@@ -338,26 +301,44 @@ export class Globe {
     ctx.globalAlpha = 0.19;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     ctx.restore();
-    ctx.strokeStyle = settings.layer === 'sea' ? '#7fe1ed' : '#c4d2b1';
-    ctx.lineWidth = settings.layer === 'sea' ? 1.5 + m.sea[1] * 3 : 0.45;
-    ctx.globalAlpha = settings.layer === 'sea' ? 0.65 : 0.4;
+    ctx.strokeStyle = '#c4d2b1';
+    ctx.lineWidth = 0.45;
+    ctx.globalAlpha = 0.3;
     ctx.stroke(this.land);
     ctx.globalAlpha = 1;
+    if (settings.layer === 'sea') {
+      const pixels = ctx.getImageData(0, 0, WIDTH, HEIGHT),
+        band = 1.3 + m.sea[1] * 5;
+      for (let i = 0; i < this.coast.length; i++) {
+        const alpha = Math.max(0, 1 - this.coast[i] / band) * 0.85;
+        if (!alpha) continue;
+        for (let c = 0; c < 3; c++)
+          pixels.data[i * 4 + c] =
+            pixels.data[i * 4 + c] * (1 - alpha) + [110, 227, 244][c] * alpha;
+      }
+      ctx.putImageData(pixels, 0, 0);
+    }
     this.texture.needsUpdate = true;
-    this.ice.forEach((mesh) => {
-      mesh.visible = settings.layer === 'ice';
-      mesh.scale.setScalar(Math.cbrt(1 - m.glacierLoss / 100));
+    this.ice.forEach(({ root, current }) => {
+      root.visible = settings.layer === 'ice';
+      current.scale.setScalar(Math.cbrt(1 - m.glacierLoss / 100));
+      current.position.y = (1 - Math.cbrt(1 - m.glacierLoss / 100)) * 0.065;
     });
-    this.water.visible = settings.layer === 'sea';
-    this.cyclone.visible = settings.layer === 'cyclone' && m.cyclone > 0;
-    this.cyclone.position.copy(location(settings.latitude, 140, 1.025));
-    this.cyclone.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      this.cyclone.position.clone().normalize(),
-    );
-    this.cyclone.scale.setScalar(0.45 + m.cyclone / 75);
+    this.weather.group.visible = settings.layer === 'cyclone';
     this.dirty = true;
     this.schedule();
+  }
+  updateWeather(snapshot: WeatherSnapshot) {
+    this.weather.update(snapshot, location, this.current.shear);
+    this.host.dataset.weatherDay = snapshot.day.toFixed(2);
+    this.host.dataset.stormCount = String(snapshot.storms.length);
+    this.host.dataset.stormPositions = JSON.stringify(
+      snapshot.storms.map(({ id, lat, lon }) => [id, lat, lon]),
+    );
+    if (this.current.layer === 'cyclone') {
+      this.dirty = true;
+      this.schedule();
+    }
   }
   private schedule() {
     if (
@@ -378,7 +359,7 @@ export class Globe {
     }
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.05) : 0;
     this.last = now;
-    const moving = this.rotating || (this.animation && this.cyclone.visible);
+    const moving = this.rotating;
     try {
       if (this.rotating) {
         this.camera.position.applyAxisAngle(
@@ -387,8 +368,6 @@ export class Globe {
         );
         this.controls.update();
       }
-      if (this.animation && this.cyclone.visible)
-        this.cyclone.rotateZ(dt * 0.7);
       if (this.dirty || moving) {
         this.renderer.render(this.scene, this.camera);
         this.frames++;
@@ -402,9 +381,8 @@ export class Globe {
       this.onError('3D 화면을 그리지 못했습니다. 다시 시작해 주세요.');
     }
   };
-  setMotion(rotate: boolean, animate: boolean) {
+  setMotion(rotate: boolean) {
     this.rotating = rotate;
-    this.animation = animate;
     this.last = 0;
     this.schedule();
   }
@@ -460,6 +438,7 @@ export class Globe {
       }
     });
     this.texture.dispose();
+    this.weather.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
