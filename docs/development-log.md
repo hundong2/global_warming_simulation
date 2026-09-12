@@ -2,6 +2,12 @@
 
 **English** | [한국어](ko/development-log.md)
 
+## 2026-09-12 · README website link
+
+Plan: add the configured GitHub Pages address immediately below the language navigation in both READMEs, then verify formatting and bilingual links with `npm run check`.
+
+Completed: both README headers now link to the configured website. `npm run check` passed, including 35 unit tests, the production build and 18 bilingual documents. Documentation-only change; browser scenarios were not rerun. The existing nonblocking bundle-size warning remains.
+
 ## 2026-09-12 · Visual simulation revision plan
 
 1. Replace the line spiral with procedural cloud systems containing an eye, eyewall and broken rainbands; model deterministic birth, growth, steering, recurvature and decay on an independent 30-day weather clock.

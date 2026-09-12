@@ -2,6 +2,8 @@
 
 **English** | [한국어](README.ko.md)
 
+**Website:** [hundong2.github.io/global_warming_simulation](https://hundong2.github.io/global_warming_simulation/)
+
 An interactive, Korean-first climate learning website for GitHub Pages. Explore a globe, warming scenarios, sea level, glacier loss, ENSO, tropical cyclone formation, climate hazards, and everyday climate action.
 
 ![Climate Lab desktop laboratory](docs/images/climate-lab.png)

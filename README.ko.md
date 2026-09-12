@@ -2,6 +2,8 @@
 
 [English](README.md) | **한국어**
 
+**웹사이트:** [hundong2.github.io/global_warming_simulation](https://hundong2.github.io/global_warming_simulation/)
+
 GitHub Pages에서 실행하는 한국어 중심 기후 학습 웹사이트입니다. 지구본, 온난화 시나리오, 해수면, 빙하 감소, 엘니뇨·라니냐, 태풍 생성 조건, 기후 위험, 일상 속 실천을 탐색합니다.
 
 ![Climate Lab 데스크톱 실험실](docs/images/climate-lab.png)
